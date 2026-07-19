@@ -41,8 +41,8 @@ The project is broken into 6 incremental slices. Each slice builds on the previo
 | **1** | Base system & serial communication (buzzer proof-of-life) | ✅ Complete | [[Slice-1-Overview]] |
 | **2** | PC teleoperation (keyboard → `/cmd_vel`) | ✅ Complete | [[Slice-2-Overview]] |
 | **3** | Motor control with encoder feedback | ✅ Complete | [[Slice-3-Overview]] |
-| **4** | Wireless game controller integration | 🔄 In progress | [[Slice-4-Overview]] |
-| **5** | Full Mecanum omnidirectional motion control | Not started | — |
+| **4** | Wireless game controller integration | ✅ Complete | [[Slice-4-Overview]] |
+| **5** | Full Mecanum omnidirectional motion control | ✅ Complete | [[Slice-5-Overview]] |
 | **6** | Vision & gimbal integration | Not started | — |
 
 ## Design Philosophy

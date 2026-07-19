@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "ROS2/ROS2-Workspace-Setup.md",
+                "file": "mpi/Slice-5/Slice-5-Overview.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "ROS2-Workspace-Setup"
+              "title": "Slice-5-Overview"
             }
           }
         ]
@@ -183,25 +183,16 @@
   },
   "active": "fa5bf39f01bde449",
   "lastOpenFiles": [
-    "ROS2/ROS2-Running-Nodes.md",
-    "ROS2/ROS2-Workspace-Setup.md",
-    "mpi/Slice-4/Progress.md",
-    "mpi/Slice-4/Slice-4-Overview.md",
-    "mpi/Slice-1/Building-and-Testing.md",
-    "mpi/Slice-1/Slice-1-Overview.md",
-    "mpi/Slice-1/Serial-Driver-Node-Walkthrough.md",
-    "mpi/Slice-1/Serial-Communication.md",
-    "mpi/Slice-1/RRC-Lite-Protocol.md",
-    "mpi/Slice-1/Protocol-Implementation.md",
-    "mpi/Slice-1/Buzzer-Node-Walkthrough.md",
-    "mpi/code-notes/Logging-Setup.md",
+    "mpi/Project-Overview.md",
+    "mpi/Slice-5/Slice-5-Overview.md",
     "ROS2/Workspace-Python-Environment.md",
-    "mpi/code-notes",
+    "ROS2/ROS2-Workspace-Setup.md",
+    "ROS2/ROS2-Running-Nodes.md",
     "ROS2/ROS2-Python-Packages.md",
     "ROS2/ROS2-Parameters.md",
     "ROS2/ROS2-Nodes-and-Topics.md",
     "ROS2/ROS2-How-To.md",
-    "mpi/Project-Overview.md",
+    "mpi/code-notes",
     "mpi/Slice-5",
     "mpi/Slice-4",
     "mpi/Slice-3",
@@ -210,6 +201,16 @@
     ".obsidian/workspace.json",
     ".obsidian",
     "mpi",
-    "ROS2"
+    "ROS2",
+    "mpi/Slice-4/Slice-4-Overview.md",
+    "mpi/Slice-4/Progress.md",
+    "mpi/Slice-1/Building-and-Testing.md",
+    "mpi/Slice-1/Slice-1-Overview.md",
+    "mpi/Slice-1/Serial-Driver-Node-Walkthrough.md",
+    "mpi/Slice-1/Serial-Communication.md",
+    "mpi/Slice-1/RRC-Lite-Protocol.md",
+    "mpi/Slice-1/Protocol-Implementation.md",
+    "mpi/Slice-1/Buzzer-Node-Walkthrough.md",
+    "mpi/code-notes/Logging-Setup.md"
   ]
 }

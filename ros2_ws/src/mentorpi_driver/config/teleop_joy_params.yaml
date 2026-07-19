@@ -1,5 +1,6 @@
 # teleop_twist_joy config for SHANWAN Android Gamepad
 # Mapping verified 2026-07-14 — see docs/vault/mpi/Slice-4/Progress.md
+# Mecanum kinematics enabled 2026-07-19 — see docs/vault/mpi/Slice-5/
 #
 # Axis map (0-indexed):
 #   0: X    — Left stick H  (right = -1.0, left = +1.0)  INVERTED
@@ -17,12 +18,25 @@
 #   10: Select  11: Start  12: Mode
 #   13: L-stick click  14: R-stick click
 #
+# Control scheme (Slice 5 — full Mecanum):
+#   Left stick Y (axis 1)  → linear.x  (forward/back)
+#   Left stick X (axis 0)  → angular.z (turn left/right)
+#   Right stick X (axis 2) → linear.y  (strafe left/right)
+#   R1 bumper (button 7)   → turbo (2× speed)
+#   X button (button 3)    → emergency stop (latched, in motor_driver)
+#
+# Strafe sign convention (ROS REP-103: +y = left):
+#   Stick right = axis 2 value -1.0
+#   We want stick right → strafe right → linear.y negative
+#   So scale_linear.y must be POSITIVE: (-1.0) * (+0.5) = -0.5 ✓
+#
 # Safety notes:
-#   - A (0) is the deadman switch: must hold to move.
+#   - A (0) deadman switch is disabled; spring-loaded sticks return to
+#     zero when released, acting as a natural deadman.
 #   - X (3) is the emergency stop: handled by motor_driver; press once to
 #     latch stop, press again to clear.
-#   - joy_node autorepeat_rate is set to 50 Hz in the launch file so /cmd_vel
-#     keeps publishing even when the stick is held still.
+#   - joy_node autorepeat_rate is set to 50 Hz in the launch file so
+#     /cmd_vel keeps publishing even when the stick is held still.
 
 teleop_twist_joy_node:
   ros__parameters:
@@ -46,11 +60,12 @@ teleop_twist_joy_node:
     scale_angular.yaw: 2.5
     scale_angular_turbo.yaw: 5.0
 
-    # --- Right stick → strafe (lateral, for mecanum in Slice 5) ---
-    # Axis 2 (Z) right = -1.0, negate so right = strafe right.
+    # --- Right stick → strafe (lateral, Mecanum) ---
+    # Axis 2 (Z) right = -1.0.  Positive scale → stick right produces
+    # negative linear.y = strafe right (REP-103: +y = left).
     axis_linear.y: 2
-    scale_linear.y: -0.5
-    scale_linear_turbo.y: -1.0
+    scale_linear.y: 0.5
+    scale_linear_turbo.y: 1.0
 
     # Unused axes
     axis_linear.z: -1

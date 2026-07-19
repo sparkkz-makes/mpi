@@ -1,20 +1,32 @@
 """
-Motor Driver Node — Slice 3
+Motor Driver Node — Slice 5 (Full Mecanum Motion Control)
 
 This ROS2 node bridges the gap between high-level velocity commands (/cmd_vel)
 and the low-level RRC Lite motor controller. It subscribes to Twist messages,
-converts them into per-wheel speeds (in revolutions per second), and sends
-multi-motor commands over serial.
+converts them into per-wheel speeds (in revolutions per second) using full
+Mecanum inverse kinematics, and sends multi-motor commands over serial.
 
-For Slice 3, the kinematics are a simple differential-drive model:
-    - linear.x  → all wheels forward/backward
-    - angular.z → left wheels and right wheels in opposite directions
+Kinematic model (X-configuration Mecanum, ABAB roller pattern):
+    v_FL = (v_x - v_y - ω·(l + w)) / r
+    v_FR = (v_x + v_y + ω·(l + w)) / r
+    v_RL = (v_x + v_y - ω·(l + w)) / r
+    v_RR = (v_x - v_y + ω·(l + w)) / r
 
-Full Mecanum inverse kinematics (strafing) will be added in Slice 5.
+where:
+    v_x = linear.x  (forward, m/s)
+    v_y = linear.y   (strafe left, m/s — ROS REP-103 convention)
+    ω   = angular.z  (turn CCW, rad/s)
+    l   = wheel_base / 2   (half length, front→centre)
+    w   = track_width / 2 (half width, centre→side)
+    r   = wheel_radius
 
-Safety: a watchdog timer stops all motors if no /cmd_vel message is received
-within the timeout period (default 0.5 s). This prevents runaway behaviour if
-the teleop node crashes or the network drops.
+All three motion components are combined linearly, so the robot can
+drive forward while strafing and turning simultaneously (e.g. a 45°
+diagonal is just forward + strafe at equal magnitude).
+
+Safety: a watchdog timer stops all motors if no /cmd_vel message is
+received within the timeout period (default 0.5 s). This prevents runaway
+behaviour if the teleop node crashes or the network drops.
 
 Usage:
     ros2 run mentorpi_driver motor_driver
@@ -45,8 +57,14 @@ class MotorDriverNode(Node):
         self.declare_parameter('baudrate', 1000000)
 
         # Robot geometry (used to convert m/s → wheel r/s)
+        #   wheel_radius : radius of each Mecanum wheel (m)
+        #   track_width  : left-to-right distance between wheel centres (m)
+        #   wheel_base   : front-to-back distance between wheel centres (m)
+        # The Mecanum kinematic term uses (l + w) = (wheel_base/2 + track_width/2),
+        # i.e. the half-diagonal from the chassis centre to a wheel.
         self.declare_parameter('wheel_radius', 0.0325)   # metres
         self.declare_parameter('track_width', 0.10)       # metres (left-to-right)
+        self.declare_parameter('wheel_base', 0.10)        # metres (front-to-back)
 
         # Motor IDs on the RRC Lite (0-3), ordered: [FL, FR, RL, RR].
         # Note: the firmware uses 0-indexed motor IDs, not 1-4 as the
@@ -79,6 +97,7 @@ class MotorDriverNode(Node):
         baudrate = self.get_parameter('baudrate').value
         self.wheel_radius = self.get_parameter('wheel_radius').value
         self.track_width = self.get_parameter('track_width').value
+        self.wheel_base = self.get_parameter('wheel_base').value
         self.motor_ids = list(self.get_parameter('motor_ids').value)
         self.invert_motors = list(self.get_parameter('invert_motors').value)
         self.watchdog_timeout = self.get_parameter('watchdog_timeout').value
@@ -88,6 +107,11 @@ class MotorDriverNode(Node):
         ).value
         log_level = self.get_parameter('log_level').value
 
+        # Pre-compute the kinematic constant used in the Mecanum equations.
+        # K = (l + w) where l = wheel_base/2, w = track_width/2.
+        # This is the half-diagonal from the chassis centre to each wheel.
+        self._kinematic_K = (self.wheel_base + self.track_width) / 2.0
+
         # Dual ROS2 + developer-friendly file logger
         self.log = NodeLogger(self, level=log_level)
 
@@ -96,7 +120,9 @@ class MotorDriverNode(Node):
         )
         self.log.info(
             f'  wheel_radius={self.wheel_radius} m, '
-            f'track_width={self.track_width} m'
+            f'track_width={self.track_width} m, '
+            f'wheel_base={self.wheel_base} m, '
+            f'K=(l+w)={self._kinematic_K:.4f} m'
         )
         self.log.info(
             f'  motor_ids={self.motor_ids}, '
@@ -152,52 +178,65 @@ class MotorDriverNode(Node):
 
     def twist_to_wheel_speeds(self, twist: Twist):
         """
-        Convert a Twist message to per-wheel speeds in r/s.
+        Convert a Twist message to per-wheel speeds in r/s using full
+        Mecanum inverse kinematics (X-configuration, ABAB roller pattern).
 
-        Differential-drive model (simplified for 4-wheel skid steer):
-            v_left  = (v - ω * W/2) / r
-            v_right = (v + ω * W/2) / r
+        The three Twist components are combined linearly so the robot can
+        execute compound motions — e.g. forward + strafe = 45° diagonal,
+        or strafe + turn = curved lateral slide.
+
+        Wheel speed equations (in m/s at the wheel contact point):
+            v_FL = v_x - v_y - ω·K
+            v_FR = v_x + v_y + ω·K
+            v_RL = v_x + v_y - ω·K
+            v_RR = v_x - v_y + ω·K
 
         where:
-            v = linear.x   (m/s)
-            ω = angular.z  (rad/s)
-            W = track_width (m)
-            r = wheel_radius (m)
+            v_x = linear.x   (forward, m/s)
+            v_y = linear.y    (strafe left, m/s — ROS REP-103: +y = left)
+            ω   = angular.z   (turn CCW, rad/s)
+            K   = (wheel_base + track_width) / 2  (half-diagonal, m)
 
-        All four left wheels get v_left, all four right wheels get v_right.
-        (Full Mecanum kinematics with strafing comes in Slice 5.)
+        Sign convention assumes an X-pattern Mecanum layout:
+            FL ╲ ╱ FR      (FL roller ↖, FR roller ↗)
+            RL ╱ ╲ RR      (RL roller ↙, RR roller ↘)
+        Positive v_y (strafe left) drives FL & RR backward, FR & RL forward.
 
         Returns:
-            List of (motor_id, speed_rps) tuples.
+            List of (motor_id, speed_rps) tuples in motor_ids order
+            [FL, FR, RL, RR].
         """
-        v = twist.linear.x          # m/s
-        omega = twist.angular.z     # rad/s
+        v_x = twist.linear.x          # m/s, forward
+        v_y = twist.linear.y          # m/s, strafe left (REP-103)
+        omega = twist.angular.z       # rad/s, CCW turn
 
-        # Linear velocity of each side (m/s)
-        v_left = v - omega * self.track_width / 2.0
-        v_right = v + omega * self.track_width / 2.0
+        K = self._kinematic_K
+
+        # Per-wheel linear velocity at the contact point (m/s)
+        v_fl = v_x - v_y - omega * K
+        v_fr = v_x + v_y + omega * K
+        v_rl = v_x + v_y - omega * K
+        v_rr = v_x - v_y + omega * K
 
         # Convert m/s → revolutions per second:  rps = v / (2π * r)
         circumference = 2.0 * math.pi * self.wheel_radius
-        rps_left = v_left / circumference
-        rps_right = v_right / circumference
+        rps_fl = v_fl / circumference
+        rps_fr = v_fr / circumference
+        rps_rl = v_rl / circumference
+        rps_rr = v_rr / circumference
 
-        # Clamp to safe maximum
-        rps_left = max(-self.max_wheel_speed,
-                       min(self.max_wheel_speed, rps_left))
-        rps_right = max(-self.max_wheel_speed,
-                        min(self.max_wheel_speed, rps_right))
-
-        # motor_ids order: [FL, FR, RL, RR]
-        # FL and RL are left side; FR and RR are right side.
+        # Clamp each wheel to the safe maximum (preserves direction)
+        clamp = lambda s: max(-self.max_wheel_speed,
+                              min(self.max_wheel_speed, s))
         raw_speeds = [
-            rps_left,    # FL
-            rps_right,   # FR
-            rps_left,    # RL
-            rps_right,   # RR
+            clamp(rps_fl),   # FL
+            clamp(rps_fr),   # FR
+            clamp(rps_rl),   # RL
+            clamp(rps_rr),   # RR
         ]
 
-        # Apply per-motor direction inversion (right side is mirrored)
+        # Apply per-motor direction inversion (left side is mirrored on
+        # this chassis — see docs/vault/mpi/Slice-3/Motor-Mapping-Discovery.md)
         wheel_speeds = []
         for motor_id, speed, invert in zip(
             self.motor_ids, raw_speeds, self.invert_motors
@@ -249,14 +288,19 @@ class MotorDriverNode(Node):
 
         # Log state transitions (stopped → moving)
         was_stopped = self.is_stopped
-        is_moving = abs(msg.linear.x) > 0.001 or abs(msg.angular.z) > 0.001
+        is_moving = (
+            abs(msg.linear.x) > 0.001
+            or abs(msg.linear.y) > 0.001
+            or abs(msg.angular.z) > 0.001
+        )
         if was_stopped and is_moving:
             self.log.info(
-                f'Received movement command: v={msg.linear.x:.2f} m/s, '
+                f'Received movement command: v_x={msg.linear.x:.2f} m/s, '
+                f'v_y={msg.linear.y:.2f} m/s, '
                 f'ω={msg.angular.z:.2f} rad/s'
             )
         self.log.debug(
-            f'cmd_vel: v={msg.linear.x:.3f}, vy={msg.linear.y:.3f}, '
+            f'cmd_vel: v_x={msg.linear.x:.3f}, v_y={msg.linear.y:.3f}, '
             f'ω={msg.angular.z:.3f}'
         )
         self.last_twist = msg
@@ -301,7 +345,8 @@ class MotorDriverNode(Node):
             heartbeat = (
                 f'Heartbeat: {status}, '
                 f'last_cmd={elapsed:.3f}s ago, '
-                f'v={self.last_twist.linear.x:.2f}, '
+                f'v_x={self.last_twist.linear.x:.2f}, '
+                f'v_y={self.last_twist.linear.y:.2f}, '
                 f'ω={self.last_twist.angular.z:.2f}'
             )
             if self.is_stopped:
