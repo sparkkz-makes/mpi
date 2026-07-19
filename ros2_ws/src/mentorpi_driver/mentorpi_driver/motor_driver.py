@@ -309,8 +309,10 @@ class MotorDriverNode(Node):
                     f'Watchdog: no cmd_vel for {elapsed:.3f}s — stopping motors'
                 )
                 # Send several stop frames; the RRC can miss a single one.
+                # NOTE: this is a watchdog stop, not an emergency stop, so we
+                # do not latch emergency_stop — releasing A and pressing it
+                # again should let the user drive without toggling e-stop.
                 self.stop_all_motors(repeat=5, flush=True)
-                self.emergency_stop = True
             return
 
         if self.emergency_stop:
