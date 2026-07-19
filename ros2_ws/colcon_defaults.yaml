@@ -1,0 +1,7 @@
+# colcon build defaults for MentorPi workspace.
+# Place this file next to your workspace root (ros2_ws/colcon_defaults.yaml)
+# or pass it explicitly with:
+#   colcon build --defaults /path/to/colcon_defaults.yaml
+build:
+  # Redirect colcon build logs away from ros2_ws/log to ros2_ws/build_logs.
+  log-base: build_logs

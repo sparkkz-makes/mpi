@@ -1,0 +1,7 @@
+# colcon runtime configuration for MentorPi workspace.
+# This file is read automatically by colcon when building from this workspace.
+{
+    "build": {
+        "log-base": "build_logs"
+    }
+}

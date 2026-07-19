@@ -1,0 +1,23 @@
+# Python virtual environment
+.venv/
+
+# VS Code settings
+.vscode/
+
+# ROS2 build artifacts
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# ROS2 logs
+ros2_ws/build_logs/
+ros2_ws/runtime_logs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# OS files
+.DS_Store
