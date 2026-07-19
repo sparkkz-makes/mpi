@@ -1,0 +1,34 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ROS2: motor_driver",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/stu/dev/mpi/ros2_ws/install/mentorpi_driver/lib/mentorpi_driver/motor_driver",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${env:PYTHONPATH}"
+            },
+            "preLaunchTask": "source-workspace",
+            "postDebugTask": "stop-robot"
+        },
+        {
+            "name": "ROS2: gamepad_teleop launch",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/opt/ros/jazzy/bin/ros2",
+            "args": [
+                "launch",
+                "mentorpi_driver",
+                "gamepad_teleop.launch.py"
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${env:PYTHONPATH}"
+            },
+            "preLaunchTask": "source-workspace",
+            "postDebugTask": "stop-robot"
+        }
+    ]
+}

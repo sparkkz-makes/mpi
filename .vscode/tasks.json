@@ -1,0 +1,35 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "source-workspace",
+            "type": "shell",
+            "command": "source /home/stu/dev/mpi/ros2_ws/activate.sh && echo \"Workspace sourced: ROS_DISTRO=$ROS_DISTRO\"",
+            "options": {
+                "cwd": "/home/stu/dev/mpi/ros2_ws"
+            },
+            "problemMatcher": [],
+            "detail": "Activate workspace venv and source ROS2 install"
+        },
+        {
+            "label": "build-workspace",
+            "type": "shell",
+            "command": "./build.sh",
+            "options": {
+                "cwd": "/home/stu/dev/mpi/ros2_ws"
+            },
+            "problemMatcher": [],
+            "detail": "Build the MentorPi workspace with colcon"
+        },
+        {
+            "label": "stop-robot",
+            "type": "shell",
+            "command": "pkill -f 'motor_driver' || true; pkill -f 'joy_node' || true; pkill -f 'teleop_node' || true; echo 'Robot nodes stopped.'",
+            "options": {
+                "cwd": "/home/stu/dev/mpi/ros2_ws"
+            },
+            "problemMatcher": [],
+            "detail": "Stop running robot nodes after debug session"
+        }
+    ]
+}
