@@ -1,5 +1,5 @@
 # teleop_twist_joy config for SHANWAN Android Gamepad
-# Mapping verified 2026-07-14 — see docs/vault/mpi/Slice-4/gamepad-mapping.md
+# Mapping verified 2026-07-14 — see docs/vault/mpi/Slice-4/Progress.md
 #
 # Axis map (0-indexed):
 #   0: X    — Left stick H  (right = -1.0, left = +1.0)  INVERTED
@@ -16,6 +16,13 @@
 #   6: L1   7: R1   8: L2-btn  9: R2-btn
 #   10: Select  11: Start  12: Mode
 #   13: L-stick click  14: R-stick click
+#
+# Safety notes:
+#   - A (0) is the deadman switch: must hold to move.
+#   - X (3) is the emergency stop: handled by motor_driver; press once to
+#     latch stop, press again to clear.
+#   - joy_node autorepeat_rate is set to 50 Hz in the launch file so /cmd_vel
+#     keeps publishing even when the stick is held still.
 
 teleop_twist_joy_node:
   ros__parameters:

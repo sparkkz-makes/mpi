@@ -51,7 +51,9 @@ Full mapping verified by hand with `joy_inspector` utility.
   - **Right stick X (axis 2)** → linear.y (strafe, for mecanum), scale -0.5
   - **A button (0)** → deadman switch (must hold to move)
   - **R1 bumper (7)** → turbo button (2x speed)
+  - **X button (3)** → emergency stop (latches; press again to clear)
   - Turbo scales: linear 1.0 m/s, angular 2.0 rad/s
+  - `joy_node` `autorepeat_rate` set to 50.0 Hz so `/cmd_vel` is published continuously
 
 ## What's Next
 
@@ -65,7 +67,7 @@ Full mapping verified by hand with `joy_inspector` utility.
 ### 6. Safety Review ⬜
 - Confirm motors stop when A is released (deadman)
 - Confirm watchdog in motor_driver still works (0.5s timeout)
-- Test emergency stop (Select button? or just release A)
+- Test emergency stop: press X → motors stop immediately → press X again to resume
 
 ## Files Created
 - `ros2_ws/src/mentorpi_driver/mentorpi_driver/joy_inspector.py` — live gamepad display

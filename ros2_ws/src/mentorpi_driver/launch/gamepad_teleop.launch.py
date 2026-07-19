@@ -22,6 +22,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         # 1. joy_node — reads /dev/input/js0, publishes /joy
+        #    autorepeat_rate=50.0 keeps /joy (and therefore /cmd_vel) flowing
+        #    at 50 Hz even when the stick is held still.
         Node(
             package='joy',
             executable='joy_node',
@@ -29,7 +31,7 @@ def generate_launch_description():
             parameters=[{
                 'device_id': 0,
                 'deadzone': 0.05,
-                'autorepeat_rate': 0.0,
+                'autorepeat_rate': 50.0,
             }],
             output='screen',
         ),

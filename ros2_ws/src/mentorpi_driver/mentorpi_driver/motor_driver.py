@@ -27,6 +27,7 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
+from sensor_msgs.msg import Joy
 
 from .logging_utils import NodeLogger
 from .protocol import RRCLiteProtocol
@@ -68,6 +69,9 @@ class MotorDriverNode(Node):
         # Maximum wheel speed (r/s) — safety clamp
         self.declare_parameter('max_wheel_speed', 2.0)
 
+        # Emergency-stop button index on the /joy message (0 = A, 3 = X)
+        self.declare_parameter('emergency_stop_button', 3)
+
         # Logging verbosity: debug, info, warn, error, fatal
         self.declare_parameter('log_level', 'info')
 
@@ -79,6 +83,9 @@ class MotorDriverNode(Node):
         self.invert_motors = list(self.get_parameter('invert_motors').value)
         self.watchdog_timeout = self.get_parameter('watchdog_timeout').value
         self.max_wheel_speed = self.get_parameter('max_wheel_speed').value
+        self.emergency_stop_button = self.get_parameter(
+            'emergency_stop_button'
+        ).value
         log_level = self.get_parameter('log_level').value
 
         # Dual ROS2 + developer-friendly file logger
@@ -94,7 +101,8 @@ class MotorDriverNode(Node):
         self.log.info(
             f'  motor_ids={self.motor_ids}, '
             f'invert_motors={self.invert_motors}, '
-            f'max_wheel_speed={self.max_wheel_speed} r/s'
+            f'max_wheel_speed={self.max_wheel_speed} r/s, '
+            f'emergency_stop_button={self.emergency_stop_button}'
         )
 
         # ── Serial connection ───────────────────────────────────────
@@ -116,17 +124,26 @@ class MotorDriverNode(Node):
         self.cmd_vel_sub = self.create_subscription(
             Twist, '/cmd_vel', self.cmd_vel_callback, 10
         )
+        self.joy_sub = self.create_subscription(
+            Joy, '/joy', self.joy_callback, 10
+        )
 
-        # Fixed-rate command timer — re-sends the last command at 20 Hz.
+        # Fixed-rate command timer — re-sends the last command at 50 Hz.
         # This ensures the RRC Lite keeps receiving commands.  If the node
         # dies, the board stops getting commands (but may keep the last
         # one — see the safety note below).
         self.last_twist = Twist()  # Defaults to all zeros (stopped)
         self.last_cmd_time = self.get_clock().now()
-        self.command_timer = self.create_timer(0.05, self.command_callback)
+        self.command_timer = self.create_timer(0.02, self.command_callback)
 
         # Track whether we are currently stopped (to avoid spamming stop cmds)
         self.is_stopped = True
+
+        # Emergency stop state. Once set, cmd_vel is ignored and stop
+        # frames are sent repeatedly until the user toggles the e-stop
+        # button again.
+        self.emergency_stop = False
+        self._prev_estop_button = 0
 
         # Heartbeat counter for periodic status logging
         self._tick_count = 0
@@ -204,21 +221,32 @@ class MotorDriverNode(Node):
             f'Serial TX: {cmd.hex()}  speeds={wheel_speeds}'
         )
 
-    def stop_all_motors(self):
-        """Send a stop command for all motors."""
+    def stop_all_motors(self, repeat: int = 1, flush: bool = False):
+        """Send a stop command for all motors, optionally repeated."""
         if not self.serial_conn:
             return
         # Bitmask 0x0F = motors 1, 2, 3, 4
         cmd = RRCLiteProtocol.cmd_motor_stop_several(0x0F)
-        self.serial_conn.write(cmd)
+        for _ in range(repeat):
+            self.serial_conn.write(cmd)
+        if flush:
+            # Only flush on emergency paths so we do not discard queued
+            # commands from other nodes (LED, servo, buzzer, etc.).
+            self.serial_conn.flush()
         self.is_stopped = True
-        self.log.debug(f'Serial TX stop: {cmd.hex()}')
+        self.log.debug(f'Serial TX stop x{repeat}: {cmd.hex()}')
 
     # ── Callbacks ────────────────────────────────────────────────────
 
     def cmd_vel_callback(self, msg: Twist):
         """Called when a Twist message arrives on /cmd_vel."""
         self.last_cmd_time = self.get_clock().now()
+
+        if self.emergency_stop:
+            # Ignore motion commands while e-stopped, but keep the time fresh
+            # so the watchdog does not also fire.
+            return
+
         # Log state transitions (stopped → moving)
         was_stopped = self.is_stopped
         is_moving = abs(msg.linear.x) > 0.001 or abs(msg.angular.z) > 0.001
@@ -233,14 +261,36 @@ class MotorDriverNode(Node):
         )
         self.last_twist = msg
 
+    def joy_callback(self, msg: Joy):
+        """Watch the emergency-stop button (default X / button 3)."""
+        buttons = msg.buttons
+        if len(buttons) <= self.emergency_stop_button:
+            return
+
+        pressed = buttons[self.emergency_stop_button]
+        # Toggle emergency stop on rising edge.
+        if pressed and not self._prev_estop_button:
+            self.emergency_stop = not self.emergency_stop
+            if self.emergency_stop:
+                self.log.warn(
+                    'EMERGENCY STOP activated — ignoring /cmd_vel and '
+                    'sending repeated stop frames'
+                )
+                # Immediately blast stop frames to the RRC.
+                self.stop_all_motors(repeat=5, flush=True)
+            else:
+                self.log.warn('Emergency stop cleared — resuming normal control')
+                self.last_cmd_time = self.get_clock().now()
+        self._prev_estop_button = pressed
+
     def command_callback(self):
-        """Fixed-rate timer (20 Hz): send the latest command or stop."""
+        """Fixed-rate timer (50 Hz): send the latest command or stop."""
         self._tick_count += 1
         elapsed = (self.get_clock().now() - self.last_cmd_time).nanoseconds / 1e9
 
-        # Heartbeat: log status every 5 seconds (100 ticks at 20 Hz).
+        # Heartbeat: log status every 5 seconds (250 ticks at 50 Hz).
         # Only log at INFO when moving; otherwise DEBUG to avoid idle noise.
-        if self._tick_count % 100 == 0:
+        if self._tick_count % 250 == 0:
             status = 'STOPPED' if self.is_stopped else 'RUNNING'
             heartbeat = (
                 f'Heartbeat: {status}, '
@@ -258,7 +308,13 @@ class MotorDriverNode(Node):
                 self.log.warn(
                     f'Watchdog: no cmd_vel for {elapsed:.3f}s — stopping motors'
                 )
-                self.stop_all_motors()
+                # Send several stop frames; the RRC can miss a single one.
+                self.stop_all_motors(repeat=5, flush=True)
+                self.emergency_stop = True
+            return
+
+        if self.emergency_stop:
+            self.stop_all_motors(repeat=1)
             return
 
         wheel_speeds = self.twist_to_wheel_speeds(self.last_twist)

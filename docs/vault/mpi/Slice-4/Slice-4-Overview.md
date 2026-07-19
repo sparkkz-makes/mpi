@@ -30,6 +30,9 @@ Replace keyboard teleoperation with a physical USB game controller for fluid man
 | Right stick X (axis 2) | left/right | Strafe (linear.y, for mecanum in Slice 5) |
 | **A button (0)** | hold | **Deadman switch** — must hold to move |
 | R1 bumper (7) | hold | Turbo (2× speed) |
+| **X button (3)** | press | **Emergency stop** — latches until pressed again |
+
+`/joy` (and therefore `/cmd_vel`) is published at a constant **50 Hz** by setting `joy_node`'s `autorepeat_rate` to `50.0`. This prevents the motor driver's watchdog from firing when the stick is held still.
 
 ## What's Next
 
