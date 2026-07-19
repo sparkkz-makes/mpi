@@ -276,10 +276,16 @@ class MotorDriverNode(Node):
                     'EMERGENCY STOP activated — ignoring /cmd_vel and '
                     'sending repeated stop frames'
                 )
+                # Zero any remembered velocity so the robot does not jump
+                # when e-stop is later cleared.
+                self.last_twist = Twist()
                 # Immediately blast stop frames to the RRC.
                 self.stop_all_motors(repeat=5, flush=True)
             else:
                 self.log.warn('Emergency stop cleared — resuming normal control')
+                # Start from a safe zero velocity; the next cmd_vel will
+                # refresh it before any motion command is sent.
+                self.last_twist = Twist()
                 self.last_cmd_time = self.get_clock().now()
         self._prev_estop_button = pressed
 

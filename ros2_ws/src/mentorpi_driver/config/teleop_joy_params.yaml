@@ -26,9 +26,12 @@
 
 teleop_twist_joy_node:
   ros__parameters:
-    # --- Deadman switch: must hold A to move ---
-    require_enable_button: true
-    enable_button: 0        # A button
+    # --- Enable / turbo buttons ---
+    # A deadman switch is disabled so the spring-loaded sticks act as the
+    # natural deadman (they return to zero when released).  X on the
+    # motor_driver is the emergency stop.
+    require_enable_button: false
+    enable_button: 0        # A button (unused when require_enable_button=false)
     enable_turbo_button: 7  # R1 bumper = turbo (faster)
 
     # --- Left stick → linear (forward/back) + angular (turn) ---
@@ -37,10 +40,11 @@ teleop_twist_joy_node:
     scale_linear.x: 0.5
     scale_linear_turbo.x: 1.0
 
-    # Axis 0 (X) right = -1.0, so negate scale to make right = turn right.
+    # Axis 0 (X) left = +1.0. Positive scale gives positive angular.z
+    # (counter-clockwise / turn left), so stick left = turn left.
     axis_angular.yaw: 0
-    scale_angular.yaw: -1.0
-    scale_angular_turbo.yaw: -2.0
+    scale_angular.yaw: 2.5
+    scale_angular_turbo.yaw: 5.0
 
     # --- Right stick → strafe (lateral, for mecanum in Slice 5) ---
     # Axis 2 (Z) right = -1.0, negate so right = strafe right.

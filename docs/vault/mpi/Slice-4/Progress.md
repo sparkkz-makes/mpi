@@ -49,10 +49,10 @@ Full mapping verified by hand with `joy_inspector` utility.
   - **Left stick Y (axis 1)** → linear.x (forward/back), scale 0.5 m/s
   - **Left stick X (axis 0)** → angular.z (turn), scale -1.0 (inverted)
   - **Right stick X (axis 2)** → linear.y (strafe, for mecanum), scale -0.5
-  - **A button (0)** → deadman switch (must hold to move)
   - **R1 bumper (7)** → turbo button (2x speed)
   - **X button (3)** → emergency stop (latches; press again to clear)
-  - Turbo scales: linear 1.0 m/s, angular 2.0 rad/s
+  - Removed A-button deadman; spring-loaded sticks return to zero when released
+  - Turbo scales: linear 1.0 m/s, angular 5.0 rad/s
   - `joy_node` `autorepeat_rate` set to 50.0 Hz so `/cmd_vel` is published continuously
 
 ## What's Next
@@ -65,8 +65,9 @@ Full mapping verified by hand with `joy_inspector` utility.
 - Test turbo (R1) feels right
 
 ### 6. Safety Review ⬜
-- Confirm motors stop when A is released (deadman)
+- Confirm motors stop when left stick is released (spring return to zero)
 - Confirm watchdog in motor_driver still works (0.5s timeout)
+- Confirm no velocity jump when emergency stop is cleared
 - Test emergency stop: press X → motors stop immediately → press X again to resume
 
 ## Files Created
