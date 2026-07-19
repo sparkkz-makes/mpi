@@ -2,7 +2,7 @@
 
 > Part of the [[Project-Overview]]. Prerequisite: [[Slice-3-Overview]]
 
-## Status: IN PROGRESS (2026-07-14)
+## Status: COMPLETE (2026-07-19)
 
 ## Objective
 
@@ -20,6 +20,8 @@ Replace keyboard teleoperation with a physical USB game controller for fluid man
 2. **Controller mapping** ✓ — all axes and buttons mapped by hand using `joy_inspector`
 3. **`joy_inspector` utility** ✓ — live in-place display of axes (bars) and buttons
 4. **`teleop_twist_joy` config** ✓ — YAML config + launch file created
+5. **Test & tune** ✓ — driving verified on hardware
+6. **Safety review** ✓ — deadman via spring sticks, watchdog, and X e-stop verified
 
 ## Control Scheme
 
@@ -37,8 +39,7 @@ The left stick is spring-loaded and returns to zero when released, so it acts as
 
 ## What's Next
 
-5. **Test & tune** ⬜ — launch the full stack and verify driving
-6. **Safety review** ⬜ — confirm deadman + watchdog behaviour
+Slice 4 is complete. Next up: [[Slice-5-Overview]] full Mecanum motion control (strafing).
 
 See [[Progress]] for the detailed log.
 

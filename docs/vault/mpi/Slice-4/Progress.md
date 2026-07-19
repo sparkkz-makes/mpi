@@ -47,7 +47,7 @@ Full mapping verified by hand with `joy_inspector` utility.
 - Launch file: `launch/gamepad_teleop.launch.py`
 - Control scheme:
   - **Left stick Y (axis 1)** → linear.x (forward/back), scale 0.5 m/s
-  - **Left stick X (axis 0)** → angular.z (turn), scale -1.0 (inverted)
+  - **Left stick X (axis 0)** → angular.z (turn), scale 2.5 rad/s
   - **Right stick X (axis 2)** → linear.y (strafe, for mecanum), scale -0.5
   - **R1 bumper (7)** → turbo button (2x speed)
   - **X button (3)** → emergency stop (latches; press again to clear)
@@ -57,14 +57,14 @@ Full mapping verified by hand with `joy_inspector` utility.
 
 ## What's Next
 
-### 5. Test & Tune ⬜
+### 5. Test & Tune ✓
 - Run `ros2 launch mentorpi_driver gamepad_teleop.launch.py`
-- Verify: hold A + push left stick up → robot drives forward
-- Verify: hold A + push left stick left/right → robot turns
+- Verify: push left stick up → robot drives forward
+- Verify: push left stick left/right → robot turns
 - Tune scales if too fast/slow
 - Test turbo (R1) feels right
 
-### 6. Safety Review ⬜
+### 6. Safety Review ✓
 - Confirm motors stop when left stick is released (spring return to zero)
 - Confirm watchdog in motor_driver still works (0.5s timeout)
 - Confirm no velocity jump when emergency stop is cleared
