@@ -221,7 +221,11 @@ class RRCLiteProtocol:
             motion_time_ms: Time to reach target positions in milliseconds.
         """
         count = len(servo_data)
-        params = bytearray(struct.pack('<HB',
+        # Frame layout (per RRC Lite protocol doc, Data Length = 3N+4):
+        #   subcommand (0x01) | motion_time (uint16) | count (uint8)
+        #   | [servo_id (uint8), pulse_width (uint16)] * count
+        params = bytearray(struct.pack('<BHB',
+                                        cls.PWM_SERVO_CMD_SEVERAL,
                                         motion_time_ms, count))
         for servo_id, pulse_width in servo_data:
             params.append(servo_id)

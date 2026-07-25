@@ -43,7 +43,7 @@ The project is broken into 6 incremental slices. Each slice builds on the previo
 | **3** | Motor control with encoder feedback | ✅ Complete | [[Slice-3-Overview]] |
 | **4** | Wireless game controller integration | ✅ Complete | [[Slice-4-Overview]] |
 | **5** | Full Mecanum omnidirectional motion control | ✅ Complete | [[Slice-5-Overview]] |
-| **6** | Vision & gimbal integration | Not started | — |
+| **6** | Vision & gimbal integration | ✅ Complete | [[Slice-6-Overview]] |
 
 ## Design Philosophy
 
@@ -61,13 +61,20 @@ ros2_ws/
 │   └── mentorpi_driver/          # The main (and currently only) package
 │       ├── package.xml
 │       ├── setup.py
+│       ├── config/               # YAML parameter files
 │       └── mentorpi_driver/
 │           ├── protocol.py       # RRC Lite serial protocol
-│           ├── serial_driver.py  # Serial driver node
-│           └── buzzer_node.py    # Buzzer proof-of-life node
+│           ├── serial_driver.py  # Serial gateway node (owns /dev/ttyACM0)
+│           ├── motor_driver.py   # /cmd_vel → /motor_cmd (Mecanum kinematics)
+│           ├── gimbal_driver.py  # /gimbal_vel → /gimbal_cmd (pan/tilt servos)
+│           ├── teleop_manager.py # /joy → /cmd_vel + /gimbal_vel + /gimbal_recenter
+│           ├── telemetry_monitor.py  # Debug in-place display of command pipeline
+│           ├── joy_inspector.py  # Debug in-place display of /joy
+│           ├── logging_utils.py  # NodeLogger + resilient_spin() helper
+│           └── buzzer_node.py    # Buzzer proof-of-life node (Slice 1)
 ├── build/                        # Build artifacts (auto-generated)
 ├── install/                      # Installed packages (auto-generated)
-└── log/                          # Build logs
+└── runtime_logs/                 # Per-run loguru logs
 ```
 
 ## ROS2 How-To Guides
@@ -91,3 +98,7 @@ Each slice has its own folder with detailed walkthroughs:
   - [[Buzzer-Node-Walkthrough]] — `buzzer_node.py` code walkthrough
   - [[Serial-Driver-Node-Walkthrough]] — `serial_driver.py` code walkthrough
   - [[Building-and-Testing]] — building and verifying the buzzer
+- **[[Slice-6-Overview]]** — Vision & Gimbal Integration
+  - [[Camera-Streaming]] — v4l2_camera + web_video_server
+  - [[Serial-Gateway-and-Gimbal]] — serial_driver gateway refactor + gimbal_driver
+  - [[Teleop-Manager]] — teleop_manager node + combined launch
