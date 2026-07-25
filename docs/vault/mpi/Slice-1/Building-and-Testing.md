@@ -6,7 +6,7 @@ This document covers the practical steps to build, run, and verify the Slice 1 c
 
 ## Prerequisites
 
-- ROS2 Jazzy installed on the Raspberry Pi
+- ROS2 Lyrical installed on the Raspberry Pi
 - The RRC Lite board connected via USB and powered on
 - The `mentorpi_driver` package in `~/dev/mpi/ros2_ws/src/`
 - pyserial installed (`pip install pyserial` or it comes with the ROS2 setup)

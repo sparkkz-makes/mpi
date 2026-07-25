@@ -13,7 +13,7 @@ The robot is controlled by an **RRC Lite** board (STM32F407VET6 microcontroller)
 | Component | Details |
 |-----------|---------|
 | **Chassis** | MentorPi 4-wheel Mecanum drive |
-| **Controller** | Raspberry Pi running Ubuntu LTS + ROS2 Jazzy |
+| **Controller** | Raspberry Pi running Ubuntu 26.04 LTS + ROS2 Lyrical |
 | **Driver Board** | RRC Lite (STM32F407VET6), UART serial interface |
 | **Motors** | 4x high-speed DC motors with AB-phase quadrature encoders |
 | **Power** | 7.4V 2200mAh 10C LiPo battery |

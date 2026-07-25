@@ -4,13 +4,13 @@
 
 ## Overview
 
-The robot runs ROS2 Jazzy on Ubuntu, which uses the system Python at `/usr/bin/python3`. To keep the workspace isolated and make it easy to install extra packages (loguru, numpy, opencv-python, etc.) without touching system packages, we use a workspace-local virtual environment created with `uv`.
+The robot runs ROS2 Lyrical on Ubuntu, which uses the system Python at `/usr/bin/python3`. To keep the workspace isolated and make it easy to install extra packages (loguru, numpy, opencv-python, etc.) without touching system packages, we use a workspace-local virtual environment created with `uv`.
 
 ## The Venv
 
 Location: `/home/stu/dev/mpi/.venv`
 
-Created with system-site-packages so ROS2 packages installed under `/opt/ros/jazzy/lib/python3.12/site-packages` remain importable:
+Created with system-site-packages so ROS2 packages installed under `/opt/ros/lyrical/lib/python3.14/site-packages` remain importable:
 
 ```bash
 cd /home/stu/dev/mpi

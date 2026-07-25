@@ -7,7 +7,7 @@
 - [[Slice-1-Overview]] complete (serial communication verified)
 - [[Slice-2-Overview]] complete (teleop publishes to `/cmd_vel`)
 - RRC Lite board powered on and connected via USB
-- `teleop_twist_keyboard` installed (comes with ROS2 Jazzy)
+- `teleop_twist_keyboard` installed (comes with ROS2 Lyrical)
 
 ## Building
 
