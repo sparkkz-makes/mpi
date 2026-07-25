@@ -148,7 +148,7 @@ class NodeLogger:
             _file_logger.info(msg)
 
     def warn(self, msg: str) -> None:
-        self.rclpy_logger.warn(msg)
+        self.rclpy_logger.warning(msg)
         if self._should_log_to_file('warn'):
             _file_logger.warning(msg)
 

@@ -316,7 +316,7 @@ class MotorDriverNode(Node):
         if pressed and not self._prev_estop_button:
             self.emergency_stop = not self.emergency_stop
             if self.emergency_stop:
-                self.log.warn(
+                self.log.warning(
                     'EMERGENCY STOP activated — ignoring /cmd_vel and '
                     'sending repeated stop frames'
                 )
@@ -326,7 +326,7 @@ class MotorDriverNode(Node):
                 # Immediately blast stop frames to the RRC.
                 self.stop_all_motors(repeat=5, flush=True)
             else:
-                self.log.warn('Emergency stop cleared — resuming normal control')
+                self.log.warning('Emergency stop cleared — resuming normal control')
                 # Start from a safe zero velocity; the next cmd_vel will
                 # refresh it before any motion command is sent.
                 self.last_twist = Twist()
@@ -356,7 +356,7 @@ class MotorDriverNode(Node):
 
         if elapsed > self.watchdog_timeout:
             if not self.is_stopped:
-                self.log.warn(
+                self.log.warning(
                     f'Watchdog: no cmd_vel for {elapsed:.3f}s — stopping motors'
                 )
                 # Send several stop frames; the RRC can miss a single one.

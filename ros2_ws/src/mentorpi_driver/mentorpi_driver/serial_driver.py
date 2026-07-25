@@ -55,7 +55,7 @@ class SerialDriverNode(Node):
     def send_command(self, frame: bytes) -> None:
         """Send a raw frame to the RRC Lite board."""
         if not self.serial_conn:
-            self.get_logger().warn('Serial connection not active. Cannot send.')
+            self.get_logger().warning('Serial connection not active. Cannot send.')
             return
         self.serial_conn.write(frame)
 
