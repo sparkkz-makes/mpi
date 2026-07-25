@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "mpi/Slice-5/Slice-5-Overview.md",
+                "file": "mpi/Slice-5/Mecanum-Kinematics.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Slice-5-Overview"
+              "title": "Mecanum-Kinematics"
             }
           }
         ]
@@ -183,8 +183,10 @@
   },
   "active": "fa5bf39f01bde449",
   "lastOpenFiles": [
-    "mpi/Project-Overview.md",
     "mpi/Slice-5/Slice-5-Overview.md",
+    "mpi/Slice-5/Progress.md",
+    "mpi/Slice-5/Mecanum-Kinematics.md",
+    "mpi/Project-Overview.md",
     "ROS2/Workspace-Python-Environment.md",
     "ROS2/ROS2-Workspace-Setup.md",
     "ROS2/ROS2-Running-Nodes.md",
