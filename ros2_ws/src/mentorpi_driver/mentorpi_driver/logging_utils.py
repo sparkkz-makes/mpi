@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 from loguru import logger as _file_logger
+import rclpy
 from rclpy.node import Node
 
 
@@ -148,7 +149,7 @@ class NodeLogger:
             _file_logger.info(msg)
 
     def warn(self, msg: str) -> None:
-        self.rclpy_logger.warn(msg)
+        self.rclpy_logger.warning(msg)
         if self._should_log_to_file('warn'):
             _file_logger.warning(msg)
 
@@ -164,3 +165,57 @@ class NodeLogger:
         self.rclpy_logger.fatal(msg)
         if self._should_log_to_file('fatal'):
             _file_logger.critical(msg)
+
+
+# ── Resilient spin helper ────────────────────────────────────────────
+#
+# rclpy 10.0.10 on Python 3.14 has an intermittent pybind11 bug in
+# Subscription.handle.take_message(): it raises
+#   RuntimeError: Unable to convert call argument '0' to Python object
+# when converting certain message fields (notably the integer arrays in
+# sensor_msgs/Joy.buttons) from the C++ ROS message to Python. The error
+# is transient (most messages decode fine) but uncaught, so a single bad
+# message kills the whole node and tears down the launch.
+#
+# `resilient_spin()` wraps rclpy.spin() and recovers from this error by
+# logging it and continuing. Use it in place of rclpy.spin(node).
+#
+# See: docs/vault/mpi/Slice-6/Teleop-Manager.md (rclpy crash workaround)
+
+
+def resilient_spin(node: Node) -> None:
+    """
+    Spin a node, recovering from the rclpy pybind11 take_message bug.
+
+    Wraps rclpy.spin_once() in a loop. If a RuntimeError escapes from
+    the executor's message-take path (the known pybind11 conversion
+    failure), it is logged and the loop continues rather than crashing
+    the node. KeyboardInterrupt and ExternalShutdownException still
+    propagate so normal shutdown works.
+
+    Args:
+        node: The rclpy Node to spin.
+    """
+    from rclpy.executors import ExternalShutdownException
+    logger = node.get_logger()
+    recover_count = 0
+
+    while rclpy.ok():
+        try:
+            rclpy.spin_once(node, timeout_sec=0.1)
+        except (KeyboardInterrupt, ExternalShutdownException):
+            raise
+        except RuntimeError as e:
+            # The known pybind11 conversion error. Log and keep going.
+            recover_count += 1
+            logger.warn(
+                f'Recovered from rclpy message-take RuntimeError '
+                f'(#{recover_count}): {e}. Continuing.'
+            )
+        except Exception as e:
+            # Any other unexpected error — log but keep the node alive.
+            recover_count += 1
+            logger.error(
+                f'Unexpected error in spin loop (#{recover_count}): {e}. '
+                f'Continuing.'
+            )

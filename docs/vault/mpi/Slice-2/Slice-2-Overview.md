@@ -10,7 +10,7 @@ Enable manual control of the robot by bridging keyboard input from the PC to the
 
 Slice 2 is lighter on code than Slice 1 — we leveraged an existing ROS2 package rather than writing our own. The work was:
 
-1. **Verified `teleop_twist_keyboard` is installed** — it ships with ROS2 Jazzy as `ros-jazzy-teleop-twist-keyboard`
+1. **Verified `teleop_twist_keyboard` is installed** — it ships with ROS2 Lyrical as `ros-lyrical-teleop-twist-keyboard`
 2. **Ran the teleop node** — it publishes `geometry_msgs/Twist` messages to `cmd_vel`
 3. **Verified messages arrive** — used `ros2 topic echo /cmd_vel` to confirm Twist messages appear when keys are pressed
 

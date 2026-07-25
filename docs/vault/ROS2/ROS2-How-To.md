@@ -2,7 +2,7 @@
 
 > See also: [[Project-Overview]] for the MentorPi project documentation
 
-A collection of beginner-friendly guides for working with ROS2 (specifically ROS2 Jazzy on Ubuntu). These are general-purpose references — not specific to the MentorPi project — but they use examples from the project where helpful.
+A collection of beginner-friendly guides for working with ROS2 (specifically ROS2 Lyrical on Ubuntu). These are general-purpose references — not specific to the MentorPi project — but they use examples from the project where helpful.
 
 ## Guides
 

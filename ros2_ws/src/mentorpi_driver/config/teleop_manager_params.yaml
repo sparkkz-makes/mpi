@@ -1,0 +1,77 @@
+# Teleop Manager parameters (Slice 6).
+#
+# Replaces teleop_twist_joy. Owns the drive/camera mode toggle and maps
+# the SHANWAN Android Gamepad to /cmd_vel + /gimbal_vel + /gimbal_recenter.
+#
+# Gamepad mapping (verified 2026-07-14 — see docs/vault/mpi/Slice-4/Progress.md):
+#   Axes (0-indexed):
+#     0: L-Stick H (left=+1, right=-1)   INVERTED
+#     1: L-Stick V (up=+1, down=-1)
+#     2: R-Stick H (left=+1, right=-1)   INVERTED
+#     3: R-Stick V (up=+1, down=-1)
+#   Buttons (0-indexed):
+#     0: A    1: B    3: X    4: Y
+#     6: L1   7: R1   8: L2-btn  9: R2-btn
+#     10: Select  11: Start  12: Mode
+#     13: L-stick click  14: R-stick click (R3)
+#
+# Mode behaviour (right stick has two modes):
+#   DRIVE (default):
+#     L-stick Y (axis 1) → /cmd_vel.linear.x  (forward/back)
+#     L-stick X (axis 0) → /cmd_vel.angular.z (turn left/right)
+#     R-stick X (axis 2) → /cmd_vel.linear.y  (strafe/slew)
+#     /gimbal_vel = zeros (gimbal holds position)
+#   CAMERA:
+#     L-stick → /cmd_vel (UNCHANGED — driving continues)
+#     R-stick V (axis 3) → /gimbal_vel.linear.x (pan rate)
+#     R-stick H (axis 2) → /gimbal_vel.linear.y (tilt rate)
+#     /cmd_vel.linear.y = 0 (slew suppressed)
+#
+# Controls:
+#   A (button 0)   → toggle mode (drive ↔ camera), rising edge
+#   R1 (button 7)  → turbo (held = 2× scales)
+#   R3 (button 14) → recenter gimbal (rising edge, one-shot)
+#   X (button 3)   → emergency stop (handled by motor_driver, latched)
+#
+# Sign conventions (ROS REP-103):
+#   +linear.x = forward, +linear.y = left, +angular.z = CCW (turn left)
+#   L-stick X left = +1.0 → positive angular.z = turn left ✓
+#   R-stick X right = -1.0 → negative linear.y = strafe right ✓ (drive mode)
+#   Gimbal pan/tilt signs are passed through; gimbal_driver applies the
+#   rate scaling. Adjust scale_pan/scale_tilt sign here if a servo is
+#   reversed mechanically.
+
+teleop_manager:
+  ros__parameters:
+    # ── Axis indices ──────────────────────────────────────────────
+    axis_linear_x: 1    # L-stick V → forward
+    axis_angular_z: 0   # L-stick H → turn
+    axis_slew: 2        # R-stick H → strafe (drive mode)
+    axis_pan: 3         # R-stick V → pan   (camera mode)
+    axis_tilt: 2        # R-stick H → tilt  (camera mode)
+
+    # ── Drive scales (m/s, rad/s) ─────────────────────────────────
+    # Match the old teleop_twist_joy config (Slice 5).
+    scale_linear_x: 0.5
+    scale_linear_x_turbo: 1.0
+    scale_angular_z: 2.5
+    scale_angular_z_turbo: 5.0
+    scale_slew: 0.5
+    scale_slew_turbo: 1.0
+
+    # ── Gimbal scales (dimensionless; gimbal_driver applies µs/s) ─
+    # 1.0 = full stick = full rate. Turbo doubles it.
+    scale_pan: -1.0
+    scale_pan_turbo: -1.0
+    scale_tilt: 1.0
+    scale_tilt_turbo: 1.0
+
+    # ── Button indices ────────────────────────────────────────────
+    mode_toggle_button: 0   # A
+    turbo_button: 7         # R1
+    recenter_button: 14     # R3 (R-stick click)
+
+    # ── Misc ──────────────────────────────────────────────────────
+    deadzone: 0.05
+    publish_rate_hz: 50.0   # must be > motor_driver watchdog (0.5s)
+    log_level: info

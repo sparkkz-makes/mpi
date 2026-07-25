@@ -1,0 +1,63 @@
+# Gimbal driver parameters for the MentorPi pan/tilt servos (Slice 6).
+#
+# These are STARTING VALUES — the servo IDs, pulse ranges, and which
+# servo is pan vs tilt MUST be verified physically before relying on
+# them. See docs/vault/mpi/Slice-6/Gimbal-Servo-Discovery.md (to be
+# created) for the discovery procedure (mirrors Slice 3 motor mapping).
+#
+# Pulse width convention (from the RRC Lite protocol doc):
+#   500 µs  = 0°
+#   1500 µs = 90° (center)
+#   2500 µs = 180°
+# The limits below default to 1000-2000 µs (≈ 45°-135°) to stay clear
+# of mechanical end-stops until the real travel range is confirmed.
+#
+# Rate control:
+#   Stick deflection sets the RATE of rotation, not the angle.
+#   pan_max_rate / tilt_max_rate are in µs per second at full stick.
+#   1000 µs/s ≈ 120°/s — a comfortable teleop pan speed.
+#   Release the stick → rate = 0 → servo HOLDS its last position.
+#   Stick click (R3) → /gimbal_recenter → snap to center.
+#
+# Units note:
+#   /gimbal_vel (Twist) carries dimensionless [-1, 1] stick values;
+#   this node scales them by the *_max_rate params to get µs/s.
+
+gimbal_driver:
+  ros__parameters:
+    # ── Servo IDs (verify physically) ─────────────────────────────
+    pan_servo_id: 1
+    tilt_servo_id: 2
+
+    # ── Pulse widths (µs) ─────────────────────────────────────────
+    pan_center_pulse: 1500
+    tilt_center_pulse: 1500
+    pan_min_pulse: 1000
+    pan_max_pulse: 2000
+    tilt_min_pulse: 1000
+    tilt_max_pulse: 2000
+
+    # ── Rate limits (µs/s at full stick) ──────────────────────────
+    # Lower = slower, more precise. Higher = snappier.
+    pan_max_rate: 1000.0
+    tilt_max_rate: 1000.0
+
+    # ── Stick deadzone ────────────────────────────────────────────
+    # |stick| < deadzone → rate = 0 (hold position). Matches the
+    # deadzone used by joy_node / teleop_twist_joy.
+    deadzone: 0.05
+
+    # ── Servo motion times (ms) ───────────────────────────────────
+    # Steady-state tracking: ~ the tick period (20 ms at 50 Hz) so the
+    # servo smoothly follows the integrator each tick.
+    motion_time_ms: 20
+    # Recenter snap: longer for a visible sweep back to center.
+    recenter_motion_ms: 300
+
+    # ── Integrator tick rate (Hz) ─────────────────────────────────
+    # Match motor_driver's 50 Hz so gimbal and motor commands
+    # interleave cleanly through the serial gateway.
+    tick_rate_hz: 50.0
+
+    # ── Logging ───────────────────────────────────────────────────
+    log_level: info

@@ -1,0 +1,51 @@
+# v4l2_camera parameters for the MentorPi USB camera (Slice 6).
+#
+# Hardware (probed 2026-07-25 with v4l2-ctl):
+#   Device : /dev/video0  ("icspring camera", USB)
+#   Format : YUYV 4:2:2 ONLY (no hardware MJPEG)
+#   Size   : 640x480 (discrete; only supported size)
+#   FPS    : 5, 10, 15, 20, 25, 30
+#
+# The camera publishes sensor_msgs/Image on /image_raw. With the
+# compressed_image_transport plugin installed, /image_raw/compressed
+# (sensor_msgs/CompressedImage, JPEG) is also published automatically —
+# web_video_server serves that to browsers as an MJPG stream.
+#
+# View in a browser (phone or PC on the same network):
+#   http://<robot-ip>:8080/stream?topic=/image_raw&type=mjpeg&width=640
+#
+# Bandwidth note:
+#   YUYV 4:2:2 is uncompressed (~18 MB/s at 640x480x30fps). On a Pi 5
+#   this is fine over USB 2.0, but if you see frame drops, lower fps
+#   to 15 or 20. The compressed_image_transport plugin re-encodes to
+#   JPEG before publishing /image_raw/compressed, so the HTTP stream
+#   stays small regardless of the capture format.
+
+v4l2_camera:
+  ros__parameters:
+    # ── Device ──────────────────────────────────────────────────
+    video_device: /dev/video0
+
+    # ── Capture format ───────────────────────────────────────────
+    # This camera ONLY supports 640x480 YUYV (probed 2026-07-25).
+    image_width: 640
+    image_height: 480
+
+    # 'yuyv' — the only format this camera supports. v4l2_camera
+    # decodes YUYV to a raw sensor_msgs/Image before publishing.
+    pixel_format: yuyv
+
+    # 30 fps is supported; lower to 15-20 if USB bandwidth is tight.
+    fps: 30.0
+
+    # ── Output topics ────────────────────────────────────────────
+    # Publishes /image_raw (sensor_msgs/Image) and, with the compressed
+    # image transport plugin, /image_raw/compressed (JPEG).
+    # camera_info_url is left empty; v4l2_camera will publish a default
+    # CameraInfo if no calibration file is provided.
+    camera_info_url: ''
+    frame_id: camera_link
+
+    # ── Timeouts ─────────────────────────────────────────────────
+    # How long to wait for the device to appear before giving up.
+    device_timeout_ms: 5000

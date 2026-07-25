@@ -35,7 +35,7 @@ Before building or running anything, you need the base ROS2 environment loaded. 
 source ~/dev/mpi/ros2_ws/activate.sh
 ```
 
-This activates the workspace venv, then sources `/opt/ros/jazzy/setup.bash`, then sources the workspace install. It sets environment variables like `ROS_DISTRO`, `AMENT_PREFIX_PATH`, and `COLCON_PREFIX_PATH` so that tools like `colcon`, `ros2`, and `rclpy` are findable.
+This activates the workspace venv, then sources `/opt/ros/lyrical/setup.bash`, then sources the workspace install. It sets environment variables like `ROS_DISTRO`, `AMENT_PREFIX_PATH`, and `COLCON_PREFIX_PATH` so that tools like `colcon`, `ros2`, and `rclpy` are findable.
 
 > [!tip] Add this to your `~/.bashrc`
 > ```bash
@@ -102,7 +102,7 @@ ros2 pkg list    # Should show your package
 > `activate.sh` handles this for you, but the underlying order is:
 > ```bash
 > source /home/stu/dev/mpi/.venv/bin/activate
-> source /opt/ros/jazzy/setup.bash  # base ROS2
+> source /opt/ros/lyrical/setup.bash  # base ROS2
 > source /home/stu/dev/mpi/ros2_ws/install/setup.bash
 > ```
 > If you source manually in the wrong order, your packages may not be found.
@@ -130,7 +130,7 @@ The typical workflow is:
 
 ```bash
 # Check ROS2 is loaded
-echo $ROS_DISTRO          # Should print: jazzy
+echo $ROS_DISTRO          # Should print: lyrical
 
 # Check your workspace is sourced
 ros2 pkg list | grep mentorpi_driver   # Should show your package
@@ -142,7 +142,7 @@ colcon --version
 ## Troubleshooting
 
 ### "ros2: command not found"
-You haven't sourced the base ROS2 setup. Run `source ~/dev/mpi/ros2_ws/activate.sh` (which sources `/opt/ros/jazzy/setup.bash` for you).
+You haven't sourced the base ROS2 setup. Run `source ~/dev/mpi/ros2_ws/activate.sh` (which sources `/opt/ros/lyrical/setup.bash` for you).
 
 ### "Package not found" after building
 You haven't sourced your workspace. Run `source ~/dev/mpi/ros2_ws/activate.sh`.

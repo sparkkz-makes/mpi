@@ -2,9 +2,15 @@
 Motor Driver Node — Slice 5 (Full Mecanum Motion Control)
 
 This ROS2 node bridges the gap between high-level velocity commands (/cmd_vel)
-and the low-level RRC Lite motor controller. It subscribes to Twist messages,
-converts them into per-wheel speeds (in revolutions per second) using full
-Mecanum inverse kinematics, and sends multi-motor commands over serial.
+and per-wheel speeds. It subscribes to Twist messages, converts them into
+per-wheel speeds (in revolutions per second) using full Mecanum inverse
+kinematics, and publishes them on /motor_cmd (sensor_msgs/JointState).
+
+This node is transport-agnostic: it does NOT open the serial port. The
+serial_driver gateway node subscribes to /motor_cmd and forwards it to
+the RRC Lite board. This separation means motor_driver can be unit-tested
+without hardware, and the controller board can be swapped by changing
+only serial_driver.
 
 Kinematic model (X-configuration Mecanum, ABAB roller pattern):
     v_FL = (v_x - v_y - ω·(l + w)) / r
@@ -34,15 +40,13 @@ Usage:
 """
 
 import math
-import serial
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import Joy
+from sensor_msgs.msg import Joy, JointState
 
-from .logging_utils import NodeLogger
-from .protocol import RRCLiteProtocol
+from .logging_utils import NodeLogger, resilient_spin
 
 
 class MotorDriverNode(Node):
@@ -52,9 +56,7 @@ class MotorDriverNode(Node):
         super().__init__('motor_driver')
 
         # ── Parameters ────────────────────────────────────────────────
-        # Serial connection
-        self.declare_parameter('port', '/dev/ttyACM0')
-        self.declare_parameter('baudrate', 1000000)
+        # (Serial connection is owned by the serial_driver gateway node.)
 
         # Robot geometry (used to convert m/s → wheel r/s)
         #   wheel_radius : radius of each Mecanum wheel (m)
@@ -93,8 +95,8 @@ class MotorDriverNode(Node):
         # Logging verbosity: debug, info, warn, error, fatal
         self.declare_parameter('log_level', 'info')
 
-        port = self.get_parameter('port').value
-        baudrate = self.get_parameter('baudrate').value
+        port = '(gateway-managed)'
+        baudrate = 0
         self.wheel_radius = self.get_parameter('wheel_radius').value
         self.track_width = self.get_parameter('track_width').value
         self.wheel_base = self.get_parameter('wheel_base').value
@@ -116,7 +118,7 @@ class MotorDriverNode(Node):
         self.log = NodeLogger(self, level=log_level)
 
         self.log.info(
-            f'MotorDriverNode starting. Port={port}, Baud={baudrate}'
+            f'MotorDriverNode starting (publishes /motor_cmd).'
         )
         self.log.info(
             f'  wheel_radius={self.wheel_radius} m, '
@@ -131,22 +133,14 @@ class MotorDriverNode(Node):
             f'emergency_stop_button={self.emergency_stop_button}'
         )
 
-        # ── Serial connection ───────────────────────────────────────
-        try:
-            self.serial_conn = serial.Serial(
-                port,
-                baudrate,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=0.02,
-            )
-            self.log.info('Serial port opened successfully.')
-        except serial.SerialException as e:
-            self.log.error(f'Failed to open serial port: {e}')
-            self.serial_conn = None
-
         # ── ROS2 interface ───────────────────────────────────────────
+        # Publisher: per-wheel speeds as JointState. The serial_driver
+        # gateway subscribes to /motor_cmd and forwards it to the RRC
+        # Lite board. This node never touches the serial port.
+        self.motor_cmd_pub = self.create_publisher(
+            JointState, '/motor_cmd', 10
+        )
+
         self.cmd_vel_sub = self.create_subscription(
             Twist, '/cmd_vel', self.cmd_vel_callback, 10
         )
@@ -250,30 +244,33 @@ class MotorDriverNode(Node):
     # ── Command sending ─────────────────────────────────────────────
 
     def send_wheel_speeds(self, wheel_speeds):
-        """Build and send a multi-motor command."""
-        if not self.serial_conn:
-            return
-
-        cmd = RRCLiteProtocol.cmd_motor_multiple(wheel_speeds)
-        self.serial_conn.write(cmd)
+        """Publish per-wheel speeds on /motor_cmd (JointState)."""
+        msg = JointState()
+        # stamp + frame_id left empty; serial_driver doesn't use them.
+        msg.name = [str(mid) for mid, _ in wheel_speeds]
+        msg.velocity = [float(spd) for _, spd in wheel_speeds]
+        self.motor_cmd_pub.publish(msg)
         self.log.debug(
-            f'Serial TX: {cmd.hex()}  speeds={wheel_speeds}'
+            f'/motor_cmd TX: {wheel_speeds}'
         )
 
     def stop_all_motors(self, repeat: int = 1, flush: bool = False):
-        """Send a stop command for all motors, optionally repeated."""
-        if not self.serial_conn:
-            return
-        # Bitmask 0x0F = motors 1, 2, 3, 4
-        cmd = RRCLiteProtocol.cmd_motor_stop_several(0x0F)
+        """
+        Publish a zero-velocity /motor_cmd to stop all motors.
+
+        The `repeat` and `flush` parameters are retained for API
+        compatibility with the watchdog/e-stop paths, but are no-ops
+        under the gateway model — the serial_driver forwards whatever
+        it receives, and the watchdog's repeated sends are handled by
+        the 50 Hz command timer re-publishing zero speeds.
+        """
+        msg = JointState()
+        msg.name = [str(mid) for mid in self.motor_ids]
+        msg.velocity = [0.0] * len(self.motor_ids)
         for _ in range(repeat):
-            self.serial_conn.write(cmd)
-        if flush:
-            # Only flush on emergency paths so we do not discard queued
-            # commands from other nodes (LED, servo, buzzer, etc.).
-            self.serial_conn.flush()
+            self.motor_cmd_pub.publish(msg)
         self.is_stopped = True
-        self.log.debug(f'Serial TX stop x{repeat}: {cmd.hex()}')
+        self.log.debug(f'/motor_cmd stop x{repeat}')
 
     # ── Callbacks ────────────────────────────────────────────────────
 
@@ -316,7 +313,7 @@ class MotorDriverNode(Node):
         if pressed and not self._prev_estop_button:
             self.emergency_stop = not self.emergency_stop
             if self.emergency_stop:
-                self.log.warn(
+                self.log.warning(
                     'EMERGENCY STOP activated — ignoring /cmd_vel and '
                     'sending repeated stop frames'
                 )
@@ -326,7 +323,7 @@ class MotorDriverNode(Node):
                 # Immediately blast stop frames to the RRC.
                 self.stop_all_motors(repeat=5, flush=True)
             else:
-                self.log.warn('Emergency stop cleared — resuming normal control')
+                self.log.warning('Emergency stop cleared — resuming normal control')
                 # Start from a safe zero velocity; the next cmd_vel will
                 # refresh it before any motion command is sent.
                 self.last_twist = Twist()
@@ -356,7 +353,7 @@ class MotorDriverNode(Node):
 
         if elapsed > self.watchdog_timeout:
             if not self.is_stopped:
-                self.log.warn(
+                self.log.warning(
                     f'Watchdog: no cmd_vel for {elapsed:.3f}s — stopping motors'
                 )
                 # Send several stop frames; the RRC can miss a single one.
@@ -377,13 +374,12 @@ class MotorDriverNode(Node):
     # ── Shutdown ─────────────────────────────────────────────────────
 
     def destroy_node(self):
-        """Stop all motors before shutting down."""
-        if self.serial_conn:
-            try:
-                self.stop_all_motors()
-                self.log.info('Motors stopped on shutdown.')
-            except Exception as e:
-                self.log.error(f'Error stopping motors: {e}')
+        """Publish a stop command before shutting down."""
+        try:
+            self.stop_all_motors()
+            self.log.info('Motors stopped on shutdown.')
+        except Exception as e:
+            self.log.error(f'Error stopping motors: {e}')
         super().destroy_node()
 
 
@@ -391,7 +387,7 @@ def main(args=None):
     rclpy.init(args=args)
     node = MotorDriverNode()
     try:
-        rclpy.spin(node)
+        resilient_spin(node)
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass
     finally:

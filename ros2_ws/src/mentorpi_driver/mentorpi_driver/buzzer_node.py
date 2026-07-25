@@ -71,7 +71,8 @@ def main(args=None):
     rclpy.init(args=args)
     node = BuzzerNode()
     try:
-        rclpy.spin(node)
+        from .logging_utils import resilient_spin
+        resilient_spin(node)
     except KeyboardInterrupt:
         pass
     finally:
