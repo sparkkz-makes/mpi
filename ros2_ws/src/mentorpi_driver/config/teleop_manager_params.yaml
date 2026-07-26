@@ -31,13 +31,14 @@
 #   A (button 0)   → toggle mode (drive ↔ camera), rising edge
 #   R1 (button 7)  → turbo (held = 2× scales)
 #   R3 (button 14) → recenter gimbal (rising edge, one-shot)
-#   X (button 3)   → emergency stop (handled by motor_driver, latched)
+#   X (button 3)   → emergency stop (latched toggle, handled HERE since the
+#                    2026-07 refactor — publishes zero /cmd_vel + /gimbal_vel)
 #
 # Sign conventions (ROS REP-103):
 #   +linear.x = forward, +linear.y = left, +angular.z = CCW (turn left)
 #   L-stick X left = +1.0 → positive angular.z = turn left ✓
 #   R-stick X right = -1.0 → negative linear.y = strafe right ✓ (drive mode)
-#   Gimbal pan/tilt signs are passed through; gimbal_driver applies the
+#   Gimbal pan/tilt signs are passed through; chassis_driver applies the
 #   rate scaling. Adjust scale_pan/scale_tilt sign here if a servo is
 #   reversed mechanically.
 
@@ -70,8 +71,9 @@ teleop_manager:
     mode_toggle_button: 0   # A
     turbo_button: 7         # R1
     recenter_button: 14     # R3 (R-stick click)
+    estop_button: 3         # X (latched toggle; zeroes /cmd_vel + /gimbal_vel)
 
     # ── Misc ──────────────────────────────────────────────────────
     deadzone: 0.05
-    publish_rate_hz: 50.0   # must be > motor_driver watchdog (0.5s)
+    publish_rate_hz: 50.0   # must be > chassis_driver watchdog (0.5s)
     log_level: info

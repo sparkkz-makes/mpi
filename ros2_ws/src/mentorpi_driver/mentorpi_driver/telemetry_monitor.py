@@ -6,20 +6,20 @@ them as a single updating screen (cursor repositioning, no scroll).
 Useful for diagnosing where a command gets lost between gamepad and actuator.
 
 Topics watched:
-    /joy          (sensor_msgs/Joy)         — raw gamepad axes & buttons
-    /cmd_vel      (geometry_msgs/Twist)     — vehicle motion command
-    /gimbal_vel   (geometry_msgs/Twist)     — gimbal rate command (pan/tilt)
-    /motor_cmd    (sensor_msgs/JointState)  — per-motor speeds (r/s)
-    /gimbal_cmd   (sensor_msgs/JointState)  — per-servo pulse widths (µs)
+    /joy          (sensor_msgs/Joy)             — raw gamepad axes & buttons
+    /cmd_vel      (geometry_msgs/Twist)         — vehicle motion command
+    /gimbal_vel   (geometry_msgs/Twist)         — gimbal rate command (pan/tilt)
+    /motor_cmd    (mentorpi_msgs/MotorCommand)  — per-motor speeds (r/s)
+    /gimbal_cmd   (mentorpi_msgs/ServoCommand)  — per-servo pulse widths (µs)
 
 A small status flag on each row shows whether the topic has received data
 in the last second (● live, ○ stale/never). This makes it obvious when a
 producer has stopped publishing (e.g. gamepad asleep, node crashed).
 A "Mode & Safety" section replicates the edge-detection logic of
-teleop_manager (drive ↔ camera toggle on A) and motor_driver (latched
-e-stop toggle on X) so you can see the inferred state without having to
-watch the node logs. NOTE: these are inferred from /joy locally — they
-will drift if the real nodes use different button indices or logic.
+teleop_manager (drive ↔ camera toggle on A, latched e-stop on X) so you
+can see the inferred state without having to watch the node logs. NOTE:
+these are inferred from /joy locally — they will drift if the real node
+uses different button indices or logic.
 Usage:
     ros2 run mentorpi_driver telemetry_monitor
 or alongside the stack:
@@ -33,7 +33,9 @@ import time
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import Joy, JointState
+from sensor_msgs.msg import Joy
+
+from mentorpi_msgs.msg import MotorCommand, ServoCommand
 
 
 # ANSI escape codes
@@ -78,19 +80,19 @@ class TelemetryMonitorNode(Node):
         self._cmd_vel_t = 0.0
         self._gimbal_vel: Twist | None = None
         self._gimbal_vel_t = 0.0
-        self._motor_cmd: JointState | None = None
+        self._motor_cmd: MotorCommand | None = None
         self._motor_cmd_t = 0.0
-        self._gimbal_cmd: JointState | None = None
+        self._gimbal_cmd: ServoCommand | None = None
         self._gimbal_cmd_t = 0.0
 
         # Inferred mode & safety state (replicated from /joy edge-detection).
-        # Defaults match teleop_manager (DRIVE) and motor_driver (e-stop off).
+        # Defaults match teleop_manager (DRIVE, e-stop off).
         self._mode = 'DRIVE'   # toggled by A button (btn 0)
         self._estop = False    # toggled by X button (btn 3)
         self._prev_mode_btn = 0
         self._prev_estop_btn = 0
         # Button indices — kept here so they're easy to tweak. Must match
-        # teleop_manager_params.yaml / motor_driver defaults.
+        # teleop_manager_params.yaml.
         self._btn_mode = 0      # A
         self._btn_turbo = 7     # R1
         self._btn_estop = 3     # X
@@ -99,8 +101,8 @@ class TelemetryMonitorNode(Node):
         self.create_subscription(Joy, '/joy', self._joy_cb, 10)
         self.create_subscription(Twist, '/cmd_vel', self._cmd_vel_cb, 10)
         self.create_subscription(Twist, '/gimbal_vel', self._gimbal_vel_cb, 10)
-        self.create_subscription(JointState, '/motor_cmd', self._motor_cmd_cb, 10)
-        self.create_subscription(JointState, '/gimbal_cmd', self._gimbal_cmd_cb, 10)
+        self.create_subscription(MotorCommand, '/motor_cmd', self._motor_cmd_cb, 10)
+        self.create_subscription(ServoCommand, '/gimbal_cmd', self._gimbal_cmd_cb, 10)
 
         # Render at ~15 Hz — fast enough to feel live, easy on the terminal.
         self.create_timer(1.0 / 15.0, self._render)
@@ -114,7 +116,7 @@ class TelemetryMonitorNode(Node):
         self._update_mode_and_safety(msg)
 
     def _update_mode_and_safety(self, msg: Joy) -> None:
-        """Replicate teleop_manager + motor_driver edge-detection on /joy.
+        """Replicate teleop_manager edge-detection on /joy.
 
         This is a LOCAL inference of the state the other nodes hold — it
         will drift if their button indices or toggle logic differ from
@@ -148,11 +150,11 @@ class TelemetryMonitorNode(Node):
         self._gimbal_vel = msg
         self._gimbal_vel_t = time.monotonic()
 
-    def _motor_cmd_cb(self, msg: JointState):
+    def _motor_cmd_cb(self, msg: MotorCommand):
         self._motor_cmd = msg
         self._motor_cmd_t = time.monotonic()
 
-    def _gimbal_cmd_cb(self, msg: JointState):
+    def _gimbal_cmd_cb(self, msg: ServoCommand):
         self._gimbal_cmd = msg
         self._gimbal_cmd_t = time.monotonic()
 
@@ -243,9 +245,9 @@ class TelemetryMonitorNode(Node):
 
         # ── /motor_cmd ──────────────────────────────────────────────
         out.append(CLEAR_LINE + f' /motor_cmd    {liveness(self._motor_cmd_t, now)}')
-        if self._motor_cmd is not None and self._motor_cmd.name:
+        if self._motor_cmd is not None and self._motor_cmd.motor_ids:
             mc = self._motor_cmd
-            for n, v in zip(mc.name, mc.velocity):
+            for n, v in zip(mc.motor_ids, mc.speeds_rps):
                 out.append(f'{CLEAR_LINE}   motor {n}  {v:+.3f} r/s  '
                            f'{axis_bar(max(-1.0, min(1.0, v)))}')
         else:
@@ -254,14 +256,13 @@ class TelemetryMonitorNode(Node):
 
         # ── /gimbal_cmd ─────────────────────────────────────────────
         out.append(CLEAR_LINE + f' /gimbal_cmd   {liveness(self._gimbal_cmd_t, now)}')
-        if self._gimbal_cmd is not None and self._gimbal_cmd.name:
+        if self._gimbal_cmd is not None and self._gimbal_cmd.servo_ids:
             gc = self._gimbal_cmd
-            motion = gc.effort[0] if gc.effort else 0.0
-            out.append(f'{CLEAR_LINE}   motion_time = {motion:.0f} ms')
-            for n, p in zip(gc.name, gc.position):
+            out.append(f'{CLEAR_LINE}   motion_time = {gc.motion_time_ms} ms')
+            for n, p in zip(gc.servo_ids, gc.pulses_us):
                 # pulse 500-2500 → -1..1 for the bar
                 norm = (p - 1500.0) / 1000.0
-                out.append(f'{CLEAR_LINE}   servo {n}  {p:7.0f} µs  '
+                out.append(f'{CLEAR_LINE}   servo {n}  {p:7d} µs  '
                            f'{axis_bar(norm)}')
         else:
             out.append(CLEAR_LINE + '   (no data yet)')

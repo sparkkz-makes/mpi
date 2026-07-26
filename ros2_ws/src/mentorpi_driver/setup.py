@@ -29,8 +29,7 @@ setup(
         'console_scripts': [
             'buzzer_node = mentorpi_driver.buzzer_node:main',
             'serial_driver = mentorpi_driver.serial_driver:main',
-            'motor_driver = mentorpi_driver.motor_driver:main',
-            'gimbal_driver = mentorpi_driver.gimbal_driver:main',
+            'chassis_driver = mentorpi_driver.chassis_driver:main',
             'teleop_manager = mentorpi_driver.teleop_manager:main',
             'joy_inspector = mentorpi_driver.joy_inspector:main',
             'telemetry_monitor = mentorpi_driver.telemetry_monitor:main',

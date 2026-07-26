@@ -3,13 +3,15 @@
 Brings up the complete stack:
   1. joy_node           — reads /dev/input/js0, publishes /joy
   2. teleop_manager     — /joy → /cmd_vel + /gimbal_vel + /gimbal_recenter
-                          (A button toggles drive ↔ camera mode)
-  3. serial_driver      — gateway: /motor_cmd + /gimbal_cmd → RRC Lite serial
-  4. motor_driver       — /cmd_vel → /motor_cmd (Mecanum kinematics)
-  5. gimbal_driver      — /gimbal_vel + /gimbal_recenter → /gimbal_cmd
-                          (rate-control integrator for pan/tilt servos)
-  6. v4l2_camera        — /dev/video0 → /image_raw
-  7. web_video_server   — HTTP MJPG stream on :8080
+                          (A button toggles drive ↔ camera mode,
+                           X button is the latched e-stop)
+  3. serial_driver      — gateway: /motor_cmd + /gimbal_cmd → RRC Lite serial,
+                          and RRC board uploads → /rrc_telemetry + /rrc_imu
+  4. chassis_driver     — /cmd_vel → /motor_cmd (Mecanum kinematics) and
+                          /gimbal_vel + /gimbal_recenter → /gimbal_cmd
+                          (merged motor_driver + gimbal_driver)
+  5. v4l2_camera        — /dev/video0 → /image_raw
+  6. web_video_server   — HTTP MJPG stream on :8080
 
 View the camera in a browser (phone or PC on the same network):
     http://<robot-ip>:8080/stream?topic=/image_raw&type=mjpeg&width=640
@@ -20,7 +22,7 @@ Controls (SHANWAN Android Gamepad):
     A (btn 0)    → toggle drive ↔ camera mode
     R1 (btn 7)   → turbo (2× speed)
     R3 (btn 14)  → recenter gimbal
-    X (btn 3)    → emergency stop (latched, in motor_driver)
+    X (btn 3)    → emergency stop (latched, in teleop_manager)
 
 Usage:
     ros2 launch mentorpi_driver teleop_camera.launch.py
@@ -98,24 +100,17 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 4. motor_driver — /cmd_vel → /motor_cmd
+        # 4. chassis_driver — /cmd_vel → /motor_cmd and
+        #    /gimbal_vel + /gimbal_recenter → /gimbal_cmd
         Node(
             package='mentorpi_driver',
-            executable='motor_driver',
-            name='motor_driver',
-            output='screen',
-        ),
-
-        # 5. gimbal_driver — /gimbal_vel + /gimbal_recenter → /gimbal_cmd
-        Node(
-            package='mentorpi_driver',
-            executable='gimbal_driver',
-            name='gimbal_driver',
+            executable='chassis_driver',
+            name='chassis_driver',
             parameters=[gimbal_config],
             output='screen',
         ),
 
-        # 6. v4l2_camera — /dev/video0 → /image_raw (only if camera:=true)
+        # 5. v4l2_camera — /dev/video0 → /image_raw (only if camera:=true)
         Node(
             package='v4l2_camera',
             executable='v4l2_camera_node',
@@ -125,7 +120,7 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 7. web_video_server — HTTP MJPG on :8080 (only if camera:=true)
+        # 6. web_video_server — HTTP MJPG on :8080 (only if camera:=true)
         Node(
             package='web_video_server',
             executable='web_video_server',

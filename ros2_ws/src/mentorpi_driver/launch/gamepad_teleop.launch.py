@@ -1,4 +1,8 @@
-"""Launch file for gamepad teleop: joy_node + teleop_twist_joy + motor_driver.
+"""Launch file for gamepad teleop: joy_node + teleop_twist_joy + chassis_driver.
+
+NOTE: this legacy launch uses teleop_twist_joy (no mode toggle, no
+gimbal, no e-stop button handling). Prefer teleop_camera.launch.py for
+the full stack; this one is kept for minimal drive-only testing.
 
 Usage:
     ros2 launch mentorpi_driver gamepad_teleop.launch.py
@@ -46,11 +50,12 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 3. motor_driver — converts /cmd_vel → RRC Lite serial commands
+        # 3. chassis_driver — converts /cmd_vel → /motor_cmd (and holds
+        #    the gimbal at center via /gimbal_cmd)
         Node(
             package='mentorpi_driver',
-            executable='motor_driver',
-            name='motor_driver',
+            executable='chassis_driver',
+            name='chassis_driver',
             output='screen',
         ),
     ])
