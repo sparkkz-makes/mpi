@@ -175,23 +175,36 @@ class NodeLogger:
 # when converting certain message fields (notably the integer arrays in
 # sensor_msgs/Joy.buttons) from the C++ ROS message to Python. The error
 # is transient (most messages decode fine) but uncaught, so a single bad
-# message kills the whole node and tears down the launch.
+# message kills the node and tears down the launch.
 #
-# `resilient_spin()` wraps rclpy.spin() and recovers from this error by
-# logging it and continuing. Use it in place of rclpy.spin(node).
+# `resilient_spin()` wraps rclpy.spin() and recovers from ONLY this
+# specific error by logging it and continuing. Any other exception
+# propagates and kills the node — earlier versions swallowed all
+# exceptions, which could mask real bugs (e.g. a broken timer callback
+# failing 10×/s forever, logged but never fixed).
+#
+# NOTE: If timers silently stop firing (no RuntimeError, but no timer
+# callbacks execute), the likely cause is a BLOCKING I/O call in a
+# callback starving the single-threaded executor — NOT an executor bug.
+# Audit serial/bus reads and writes for missing timeouts.
 #
 # See: docs/vault/mpi/Slice-6/Teleop-Manager.md (rclpy crash workaround)
+
+
+_PYBIND11_TAKE_MESSAGE_SIGNATURE = 'Unable to convert call argument'
 
 
 def resilient_spin(node: Node) -> None:
     """
     Spin a node, recovering from the rclpy pybind11 take_message bug.
 
-    Wraps rclpy.spin_once() in a loop. If a RuntimeError escapes from
-    the executor's message-take path (the known pybind11 conversion
-    failure), it is logged and the loop continues rather than crashing
-    the node. KeyboardInterrupt and ExternalShutdownException still
-    propagate so normal shutdown works.
+    Wraps rclpy.spin_once() in a loop. If a RuntimeError matching the
+    known pybind11 conversion failure escapes from the executor's
+    message-take path, it is logged and the loop continues rather than
+    crashing the node. KeyboardInterrupt and ExternalShutdownException
+    still propagate so normal shutdown works, and ALL other exceptions
+    propagate too — unknown bugs should kill the node loudly, not be
+    retried forever.
 
     Args:
         node: The rclpy Node to spin.
@@ -204,18 +217,13 @@ def resilient_spin(node: Node) -> None:
         try:
             rclpy.spin_once(node, timeout_sec=0.1)
         except (KeyboardInterrupt, ExternalShutdownException):
-            raise
+            return
         except RuntimeError as e:
-            # The known pybind11 conversion error. Log and keep going.
+            if _PYBIND11_TAKE_MESSAGE_SIGNATURE not in str(e):
+                # Unknown RuntimeError — not the pybind11 bug. Crash loudly.
+                raise
             recover_count += 1
             logger.warn(
                 f'Recovered from rclpy message-take RuntimeError '
                 f'(#{recover_count}): {e}. Continuing.'
-            )
-        except Exception as e:
-            # Any other unexpected error — log but keep the node alive.
-            recover_count += 1
-            logger.error(
-                f'Unexpected error in spin loop (#{recover_count}): {e}. '
-                f'Continuing.'
             )

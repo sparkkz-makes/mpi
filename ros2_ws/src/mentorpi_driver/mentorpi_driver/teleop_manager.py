@@ -25,11 +25,19 @@ Mode toggle:
 
 Recenter:
     Right-stick click (R3, rising edge) → publish one Empty on
-    /gimbal_recenter. The gimbal_driver snaps both servos to center.
+    /gimbal_recenter. The chassis_driver snaps both servos to center.
 
 Turbo:
     R1 bumper (button 7) held → use turbo scales (2× drive speed, 2×
     gimbal rate). Same convention as the old teleop_twist_joy config.
+
+Emergency stop (owned here since the 2026-07 refactor — previously split
+into motor_driver, which meant a crash there silently lost the e-stop):
+    X button (rising edge) → toggle latched e-stop. While latched,
+    /cmd_vel and /gimbal_vel are published as zeros (the steady 50 Hz
+    zero stream is what actually stops the wheels on the RRC board,
+    whose firmware has no command timeout). /gimbal_recenter is also
+    blocked. Toggle again to resume.
 
 This node is transport-agnostic (no serial, no protocol). It only reads
 /joy and publishes command topics.
@@ -95,6 +103,7 @@ class TeleopManagerNode(Node):
         self.declare_parameter('mode_toggle_button', 0)   # A
         self.declare_parameter('turbo_button', 7)         # R1
         self.declare_parameter('recenter_button', 14)     # R3 (R-stick click)
+        self.declare_parameter('estop_button', 3)         # X
 
         # ── Parameters: misc ─────────────────────────────────────────
         self.declare_parameter('deadzone', 0.05)
@@ -122,6 +131,7 @@ class TeleopManagerNode(Node):
         self.btn_mode = int(self.get_parameter('mode_toggle_button').value)
         self.btn_turbo = int(self.get_parameter('turbo_button').value)
         self.btn_recenter = int(self.get_parameter('recenter_button').value)
+        self.btn_estop = int(self.get_parameter('estop_button').value)
 
         self.deadzone = float(self.get_parameter('deadzone').value)
         pub_rate = float(self.get_parameter('publish_rate_hz').value)
@@ -133,6 +143,8 @@ class TeleopManagerNode(Node):
         self.mode = MODE_DRIVE
         self._prev_mode_btn = 0
         self._prev_recenter_btn = 0
+        self._prev_estop_btn = 0
+        self.estop = False
 
         # Latest /joy snapshot (so the timer can publish at a steady rate
         # even between joy messages — matches joy_node autorepeat pattern).
@@ -143,7 +155,8 @@ class TeleopManagerNode(Node):
             f'axes: lin_x={self.ax_lin_x}, ang_z={self.ax_ang_z}, '
             f'slew/pan={self.ax_slew}, tilt={self.ax_tilt}. '
             f'buttons: mode(A)={self.btn_mode}, turbo(R1)={self.btn_turbo}, '
-            f'recenter(R3)={self.btn_recenter}. '
+            f'recenter(R3)={self.btn_recenter}, '
+            f'estop(X)={self.btn_estop}. '
             f'publish_rate={pub_rate} Hz, mode=DRIVE'
         )
 
@@ -192,9 +205,29 @@ class TeleopManagerNode(Node):
             self.log.info(f'Mode toggle → {mode_name}')
         self._prev_mode_btn = curr_mode
 
+        # E-stop (X button, rising edge) — latched toggle. Owned here so
+        # the safety path is in the gamepad node rather than split across
+        # processes. publish_callback zeroes all outputs while latched.
+        curr_estop = self._button(msg, self.btn_estop)
+        if self._rising_edge(self._prev_estop_btn, curr_estop):
+            self.estop = not self.estop
+            if self.estop:
+                self.log.warning(
+                    'EMERGENCY STOP activated — publishing zero '
+                    '/cmd_vel + /gimbal_vel until cleared'
+                )
+            else:
+                self.log.warning(
+                    'Emergency stop cleared — resuming normal control'
+                )
+        self._prev_estop_btn = curr_estop
+
         # Recenter (R3, rising edge) — fire-and-forget
         curr_recenter = self._button(msg, self.btn_recenter)
-        if self._rising_edge(self._prev_recenter_btn, curr_recenter):
+        if (
+            self._rising_edge(self._prev_recenter_btn, curr_recenter)
+            and not self.estop
+        ):
             self.recenter_pub.publish(Empty())
             self.log.info('Recenter triggered (R3 click)')
         self._prev_recenter_btn = curr_recenter
@@ -202,7 +235,17 @@ class TeleopManagerNode(Node):
         self.latest_joy = msg
 
     def publish_callback(self) -> None:
-        """Publish /cmd_vel and /gimbal_vel at the steady rate."""
+        """Publish /cmd_vel and /gimbal_vel at the steady rate.
+
+        While e-stopped, both are published as zeros: the steady 50 Hz
+        zero stream is what actually parks the wheels, because the RRC
+        Lite firmware has no command timeout and would otherwise hold
+        the last non-zero frame forever."""
+        if self.estop:
+            self.cmd_vel_pub.publish(Twist())
+            self.gimbal_vel_pub.publish(Twist())
+            return
+
         joy = self.latest_joy
         turbo = bool(self._button(joy, self.btn_turbo))
 
