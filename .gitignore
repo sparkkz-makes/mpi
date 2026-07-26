@@ -21,3 +21,6 @@ __pycache__/
 
 # OS files
 .DS_Store
+
+# Obsidian per-user workspace state
+docs/vault/.obsidian/user/
